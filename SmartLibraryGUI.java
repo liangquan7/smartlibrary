@@ -544,28 +544,30 @@ public class SmartLibraryGUI extends JFrame {
      * with any borrows / returns performed after startup.
      */
     void syncHistoryTableFromStack() {
-        Stack<BorrowHistory> stack = library.getHistoryStack();
-        if (stack == null || stack.isEmpty()) return;
-
-        // Reset both the model and the sequence counter before rebuilding
-        historyModel.setRowCount(0);
-        borrowSeq = 0;
-
-        // Walk from bottom (index 0) to top (index size-1), insert at row 0
-        for (int i = 0; i < stack.size(); i++) {
-            BorrowHistory record = stack.get(i);
-            borrowSeq++;
-            historyModel.insertRow(0, new Object[]{
-                borrowSeq,
-                record.getTitle(),
-                record.getAuthor(),
-                record.getIsbn()
-            });
-        }
-
-        log("[Startup] Restored " + stack.size() + " history record(s) to the table.");
-        setStatus("Session restored — " + stack.size() + " history record(s) loaded.");
+    Stack<BorrowHistory> stack = library.getHistoryStack();
+    // 无论栈是否为空，都要先清空表格 clear whether it is blank or not
+    historyModel.setRowCount(0);
+    borrowSeq = 0;
+    
+    if (stack == null || stack.isEmpty()) {
+        // 栈为空，表格已经是空的，直接返回 if it's blank just return
+        log("[Sync] History stack is empty, table cleared.");
+        return;
     }
+    
+    // 从栈底到栈顶插入到表格第0行，保持 LIFO 顺序 from the lower to the top, keep LIFO sequence
+    for (int i = 0; i < stack.size(); i++) {
+        BorrowHistory record = stack.get(i);
+        borrowSeq++;
+        historyModel.insertRow(0, new Object[]{
+            borrowSeq,
+            record.getTitle(),
+            record.getAuthor(),
+            record.getIsbn()
+        });
+    }
+    log("[Sync] Restored " + stack.size() + " history record(s) to the table.");
+}
 
     // ==========================================================================
     //  ACTION HANDLERS

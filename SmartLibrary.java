@@ -32,6 +32,9 @@ public class SmartLibrary {
     /** Auto-saved history stack written on exit and read back on the next launch. */
     private static final String SAVED_HISTORY = "current_history.txt";
 
+    /** Users' info.*/
+    private static final String USERS_FILE = "users.txt";
+
     // =========================================================================
     //  Entry point
     // =========================================================================
@@ -61,52 +64,92 @@ public class SmartLibrary {
         System.out.println("Restoring borrowing history from \"" + SAVED_HISTORY + "\"...");
         library.preloadHistory(SAVED_HISTORY);
 
-        // ── Menu loop ─────────────────────────────────────────────────────────
-        while (true) {
-            System.out.println("\n=== Smart Library System ===");
-            System.out.println("1. Add Book");
-            System.out.println("2. Search Book");
-            System.out.println("3. Borrow Book");
-            System.out.println("4. View History");
-            System.out.println("5. Return Book by ISBN");
-            System.out.println("6. Exit");
-            System.out.print("Enter your choice: ");
+        // Read in Users' info
+        library.preloadBorrowers(USERS_FILE);
 
-            int choice;
-            try {
-                choice = scanner.nextInt();
-            } catch (InputMismatchException e) {
-                System.out.println("Invalid input. Please enter numbers only.");
-                scanner.nextLine();
-                continue;
+        // ── Login Loop ──────────────────────────────────
+        while (true) {
+            System.out.println("\n=== Smart Library Login ===");
+            System.out.println("1. Login as Librarian");
+            System.out.println("2. Login as Borrower");
+            System.out.println("3. Exit System");
+            System.out.print("Select role: ");
+
+            int roleChoice = readInt(scanner, "");
+            if (roleChoice == 3) {
+                System.out.println("\nSaving library state...");
+                library.saveLibraryState(SAVED_CATALOGUE, SAVED_HISTORY);
+                System.out.println("Goodbye!");
+                scanner.close();
+                return;
             }
-            scanner.nextLine();
+
+            if (roleChoice == 1) {
+                System.out.print("Enter Librarian Password: ");
+                String pass = scanner.nextLine();
+                if ("42".equals(pass)) {
+                    librarianMenu(library, scanner);
+                } else {
+                    System.out.println("Access Denied!");
+                }
+            } else if (roleChoice == 2) {
+                System.out.print("Enter Borrower ID: ");
+                String id = scanner.nextLine();
+                System.out.print("Enter Key: ");
+                String key = scanner.nextLine();
+                
+                if (library.authenticateBorrower(id, key)) {
+                    borrowerMenu(library, scanner, id);
+                } else {
+                    System.out.println("Invalid ID or Key!");
+                }
+            }
+        }
+    }
+
+    // ── Sub-Menu -- Librarian Menu ─────────────────────────────────────────
+    private static void librarianMenu(LibraryADT library, Scanner scanner) {
+        while (true) {
+            System.out.println("\n--- Librarian Panel ---");
+            System.out.println("1. Add Book / Add Stock"); // Same method adds stock if ISBN exists
+            System.out.println("2. Delete Book");
+            System.out.println("3. Search Book");
+            System.out.println("4. View All History");
+            System.out.println("5. Logout");
+            int choice = readInt(scanner, "Enter choice: ");
 
             switch (choice) {
-                case 1:
-                    handleAddBook(library, scanner);
+                case 1: handleAddBook(library, scanner); break;
+                case 2: 
+                    int isbn = readInt(scanner, "Enter ISBN to delete: ");
+                    if (isbn != -1) library.deleteBook(isbn);
                     break;
-                case 2:
-                    handleSearchBook(library, scanner);
-                    break;
-                case 3:
-                    handleBorrowBook(library, scanner);
-                    break;
-                case 4:
-                    library.viewLatestHistory();
-                    break;
-                case 5:
-                    handleReturnBook(library, scanner);
-    break; 
-                case 6:
-                    // ── Save state before exit ────────────────────────────────
-                    System.out.println("\nSaving library state...");
-                    library.saveLibraryState(SAVED_CATALOGUE, SAVED_HISTORY);
-                    System.out.println("Thank you for using Smart Library. Goodbye!");
-                    scanner.close();
-                    return;
-                default:
-                    System.out.println("Invalid choice. Please select 1-6.");
+                case 3: handleSearchBook(library, scanner); break;
+                case 4: library.viewLatestHistory(null); break;
+                case 5: return; // Logout
+                default: System.out.println("Invalid choice.");
+            }
+        }
+    }
+
+    // ── Sub-Menu -- Borrower Menu ─────────────────────────────────────────
+    private static void borrowerMenu(LibraryADT library, Scanner scanner, String borrowerID) {
+        while (true) {
+            System.out.println("\n--- Borrower Panel ---");
+            System.out.println("1. Search Book");
+            System.out.println("2. Borrow Book");
+            System.out.println("3. Return Book");
+            System.out.println("4. View My History");
+            System.out.println("5. Logout");
+            int choice = readInt(scanner, "Enter choice: ");
+
+            switch (choice) {
+                case 1: handleSearchBook(library, scanner); break;
+                case 2: handleBorrowBook(library, scanner, borrowerID); break;
+                case 3: handleReturnBook(library, scanner, borrowerID); break;
+                case 4: library.viewLatestHistory(borrowerID); break; // Can be upgraded later to filter by user
+                case 5: return; // Logout
+                default: System.out.println("Invalid choice.");
             }
         }
     }
@@ -125,7 +168,7 @@ public class SmartLibrary {
         System.out.print("Enter Author: ");
         String author = scanner.nextLine();
 
-        library.addBook(isbn, title, author);
+        library.addBook(isbn, title, author, 1);
         System.out.println("Book added successfully!");
     }
 
@@ -142,19 +185,19 @@ public class SmartLibrary {
         }
     }
 
-    private static void handleBorrowBook(LibraryADT library, Scanner scanner) {
+    private static void handleBorrowBook(LibraryADT library, Scanner scanner, String borrowerID) {
         int isbn = readInt(scanner, "Enter ISBN to borrow: ");
         if (isbn == -1) return;
 
-        library.borrowBook(isbn);
+        library.borrowBook(isbn, borrowerID);
     }
 
 
-    private static void handleReturnBook(LibraryADT library, Scanner scanner) {
+    private static void handleReturnBook(LibraryADT library, Scanner scanner, String borrowerID) {
         int isbn = readInt(scanner, "Enter ISBN of the book to return: ");
         if (isbn == -1) return;
         
-        library.returnBook(isbn);
+        library.returnBook(isbn, borrowerID);
     }
     // =========================================================================
     //  Input utility

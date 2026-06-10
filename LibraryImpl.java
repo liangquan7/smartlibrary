@@ -36,11 +36,14 @@ public class LibraryImpl implements LibraryADT {
     // Borrowing history stack (LIFO)
     private Stack<BorrowHistory> historyStack;
 
+    // List of borrowers
+    private ArrayList<Borrower> borrowers = new ArrayList<>();
+
     // Delimiter used in all data files
     private static final String FILE_DELIMITER = "\\|";
 
     // Expected number of fields per line in any data file
-    private static final int EXPECTED_FIELDS = 3;
+    private static final int EXPECTED_FIELDS = 4;
 
     // =========================================================================
     //  Constructor
@@ -59,12 +62,12 @@ public class LibraryImpl implements LibraryADT {
     // =========================================================================
 
     @Override
-    public void addBook(int isbn, String title, String author) {
-        root = insertBST(root, isbn, title, author);
+    public void addBook(int isbn, String title, String author, int stock) {
+        root = insertBST(root, isbn, title, author, stock);
     }
 
     @Override
-    public void borrowBook(int isbn) {
+    public void borrowBook(int isbn, String borrowerID) {
         Book book = searchBook(isbn);
 
         if (book == null) {
@@ -73,22 +76,32 @@ public class LibraryImpl implements LibraryADT {
             return;
         }
 
+        // Check stock
+        if (book.getStock() <= 0) {
+            System.out.println("Error: Book is currently out of stock!");
+            return;
+        }
+
         // Record borrowing in history stack BEFORE removing from BST
         BorrowHistory record = new BorrowHistory();
         record.setIsbn(isbn);
         record.setTitle(book.getTitle());
         record.setAuthor(book.getAuthor());
+        record.setBID(borrowerID);
         historyStack.push(record);
 
-        // Remove book from BST catalogue after borrowing
-        root = deleteBST(root, isbn);
+        // Decrease book stock by 1; if no book left, remove from BST catalogue after borrowing
+        if(book.borrowOut()){
+            root = deleteBST(root, isbn);
+        }
+        
 
         System.out.println("Book borrowed: " + record.getTitle() +
                 " by " + record.getAuthor());
     }
 
     @Override
-    public void viewLatestHistory() {
+    public void viewLatestHistory(String borrowerID) {
         if (historyStack.isEmpty()) {
             System.out.println("No borrowing history yet.");
             return;
@@ -101,9 +114,12 @@ public class LibraryImpl implements LibraryADT {
         // Iterate from top of stack (newest) downward to show latest 10
         for (int i = size - 1; i >= 0; i--) { //size - limit
             BorrowHistory record = historyStack.get(i);
-            System.out.println(String.format("[%d] %s by %s (ISBN: %d)",
+            if(borrowerID != null && !borrowerID.equals(record.getBID())){
+                continue;
+            }
+            System.out.println(String.format("[%d] %s by %s (ISBN: %d) - Borrower: %s",
                     (size - i), record.getTitle(), record.getAuthor(),
-                    record.getIsbn()));
+                    record.getIsbn(), record.getBID()));
         }
         System.out.println("==============================\n");
     }
@@ -114,7 +130,7 @@ public class LibraryImpl implements LibraryADT {
     }
 
     @Override
-    public void returnBook(int isbn) {
+    public void returnBook(int isbn, String borrowerID) {
         if (historyStack.isEmpty()) {
             System.out.println("No borrowing history found. Cannot return book.");
             return;
@@ -123,9 +139,12 @@ public class LibraryImpl implements LibraryADT {
         // 从栈顶向下查找第一个匹配 ISBN 的记录（即最近一次借阅未归还的） search
         int index = -1;
         for (int i = historyStack.size() - 1; i >= 0; i--) {
+            BorrowHistory record = historyStack.get(i);
             if (historyStack.get(i).getIsbn() == isbn) {
-                index = i;
-                break;
+                if(borrowerID == null || borrowerID.equals(record.getBID())){
+                    index = i;
+                    break;
+                }
             }
         }
 
@@ -136,13 +155,31 @@ public class LibraryImpl implements LibraryADT {
 
         // 取出记录并删除 change record
         BorrowHistory record = historyStack.remove(index);
+
+        /**
+         * Search the book in the BST, if found, increase stock by 1;
+         * if not found, re-add the book to the BST with stock 1
+         */
+        Book book = searchBook(isbn);
+        if (book != null) {
+            book.returnIn(); // Just increment stock
+        } else {
+            addBook(isbn, record.getTitle(), record.getAuthor(), 1); // Re-insert if deleted
+        }
+
         String title = record.getTitle();
-        String author = record.getAuthor();
-
-        // 重新插入 BST readd
-        addBook(isbn, title, author);
-
         System.out.println("Successfully returned: " + title + " (ISBN: " + isbn + ")");
+    }
+
+    @Override
+    public void deleteBook(int isbn) {
+        Book book = searchBook(isbn);
+        if (book != null) {
+            root = deleteBST(root, isbn);
+            System.out.println("Book with ISBN " + isbn + " deleted from catalog.");
+        } else {
+            System.out.println("Book not found.");
+        }
     }
 
     // =========================================================================
@@ -207,6 +244,7 @@ public class LibraryImpl implements LibraryADT {
                 String isbnRaw = fields[0].trim();
                 String title   = fields[1].trim();
                 String author  = fields[2].trim();
+                String stockRaw= fields[3].trim();
 
                 // Validate ISBN is a valid integer
                 int isbn;
@@ -228,8 +266,20 @@ public class LibraryImpl implements LibraryADT {
                     continue;
                 }
 
+                // Validate stock is a valid integer
+                int stock;
+                try {
+                    stock = Integer.parseInt(stockRaw);
+                } catch (NumberFormatException e) {
+                    System.out.println("  [WARN] Line " + lineNumber +
+                            ": Invalid stock \"" + stockRaw +
+                            "\" (must be an integer) — skipping.");
+                    skipped++;
+                    continue;
+                }
+
                 // All checks passed — add to the list, pending sort and tree-building
-                bookList.add(new Book(isbn, title, author));
+                bookList.add(new Book(isbn, title, author, stock));
             }
 
             // Remove the duplicates
@@ -321,6 +371,7 @@ public class LibraryImpl implements LibraryADT {
                 String isbnRaw = fields[0].trim();
                 String title   = fields[1].trim();
                 String author  = fields[2].trim();
+                String bID     = fields[3].trim();
 
                 int isbn;
                 try {
@@ -332,9 +383,9 @@ public class LibraryImpl implements LibraryADT {
                     continue;
                 }
 
-                if (title.isEmpty() || author.isEmpty()) {
+                if (title.isEmpty() || author.isEmpty() || bID.isEmpty()) {
                     System.out.println("  [WARN] History line " + lineNumber +
-                            ": Empty title or author — skipping.");
+                            ": Empty title, author, or borrower ID — skipping.");
                     skipped++;
                     continue;
                 }
@@ -344,6 +395,7 @@ public class LibraryImpl implements LibraryADT {
                 record.setIsbn(isbn);
                 record.setTitle(title);
                 record.setAuthor(author);
+                record.setBID(bID);
                 historyStack.push(record);
                 loaded++;
             }
@@ -360,6 +412,32 @@ public class LibraryImpl implements LibraryADT {
         } catch (IOException e) {
             System.out.println("[ERROR] Failed to read history from \"" + historyPath +
                     "\" at line " + lineNumber + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Loads the borrowers login info from a file.
+     *
+     * @param filePath Path to the saved user's info
+     *                    (e.g. "user.txt")
+     */
+    @Override
+    public void preloadBorrowers(String filePath) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.trim().isEmpty() || line.startsWith("#")) continue;
+                String[] fields = line.split(","); 
+                if (fields.length >= 3) {
+                    String id = fields[0].trim();
+                    String encryptedKey = fields[1].trim();
+                    int borrowed = Integer.parseInt(fields[2].trim());
+                    borrowers.add(new Borrower(id, encryptedKey, borrowed));
+                }
+            }
+            System.out.println("[INFO] Borrowers loaded successfully.");
+        } catch (Exception e) {
+            System.out.println("[INFO] Borrowers file not found at " + filePath + ". Starting empty.");
         }
     }
 
@@ -392,7 +470,7 @@ public class LibraryImpl implements LibraryADT {
     @Override
     public void saveLibraryState(String cataloguePath, String historyPath) {
 
-        // ── 1. Save BST via pre-order traversal ───────────────────────────────
+        // ── 1. Save BST via In-order traversal ───────────────────────────────
         try (PrintWriter writer = new PrintWriter(new FileWriter(cataloguePath))) {
 
             writer.println("# Smart Library — Current Catalogue (auto-saved)");
@@ -419,7 +497,7 @@ public class LibraryImpl implements LibraryADT {
             int histCount = historyStack.size();
             for (int i = 0; i < histCount; i++) {
                 BorrowHistory r = historyStack.get(i);
-                writer.println(r.getIsbn() + "|" + r.getTitle() + "|" + r.getAuthor());
+                writer.println(r.getIsbn() + "|" + r.getTitle() + "|" + r.getAuthor() + "|" + r.getBID());
             }
 
             System.out.println("[Save] History   : " + histCount +
@@ -448,7 +526,7 @@ public class LibraryImpl implements LibraryADT {
         int left = saveBSTInOrder(node.getLeft(),  writer);
 
         // Write this node Secondly (In-order)
-        writer.println(node.getIsbn() + "|" + node.getTitle() + "|" + node.getAuthor());
+        writer.println(node.getIsbn() + "|" + node.getTitle() + "|" + node.getAuthor() + "|" + node.getStock());
 
         //Recurse into right subtrees at last (In-order)
         int right = saveBSTInOrder(node.getRight(), writer);
@@ -497,16 +575,19 @@ public class LibraryImpl implements LibraryADT {
      * @param author Author of new book
      * @return Updated subtree root
      */
-    private Book insertBST(Book node, int isbn, String title, String author) {
+    private Book insertBST(Book node, int isbn, String title, String author, int stock) {
         if (node == null) {
-            return new Book(isbn, title, author);
+            return new Book(isbn, title, author, stock);
         }
         if (isbn < node.getIsbn()) {
-            node.setLeft(insertBST(node.getLeft(), isbn, title, author));
+            node.setLeft(insertBST(node.getLeft(), isbn, title, author, stock));
         } else if (isbn > node.getIsbn()) {
-            node.setRight(insertBST(node.getRight(), isbn, title, author));
+            node.setRight(insertBST(node.getRight(), isbn, title, author, stock));
         }
-        // isbn == node.getIsbn() → duplicate, do nothing
+        // isbn == node.getIsbn() → stock increasing by 1
+        else{
+            node.setStock(node.getStock() + stock);
+        }
         return node;
     }
 
@@ -578,5 +659,19 @@ public class LibraryImpl implements LibraryADT {
             node = node.getLeft();
         }
         return node;
+    }
+
+    // =========================================================================
+    //  RBAC
+    // =========================================================================
+
+    @Override
+    public boolean authenticateBorrower(String id, String rawKey) {
+        for (Borrower b : borrowers) {
+            if (b.getID().equals(id) && b.verify(rawKey)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

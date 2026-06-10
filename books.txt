@@ -2,23 +2,23 @@
 # Format: ISBN|Title|Author
 # Lines beginning with '#' are ignored as comments
 
-1003|1984|George Orwell
-1007|The Lord of the Rings|J.R.R. Tolkien
-1001|The Great Gatsby|F. Scott Fitzgerald
-1015|The Adventures of Huckleberry Finn|Mark Twain
-1005|The Catcher in the Rye|J.D. Salinger
-1012|One Hundred Years of Solitude|Gabriel Garcia Marquez
-1002|To Kill a Mockingbird|Harper Lee
-1018|The Odyssey|Homer
-1009|The Hobbit|J.R.R. Tolkien
-1004|Pride and Prejudice|Jane Austen
-1016|Moby Dick|Herman Melville
-1011|The Alchemist|Paulo Coelho
-1006|Brave New World|Aldous Huxley
-1019|Frankenstein|Mary Shelley
-1008|Harry Potter and the Philosophers Stone|J.K. Rowling
-1013|Don Quixote|Miguel de Cervantes
-1010|Animal Farm|George Orwell
-1020|The Picture of Dorian Gray|Oscar Wilde
-1014|Crime and Punishment|Fyodor Dostoevsky
-1017|War and Peace|Leo Tolstoy
+1003|1984|George Orwell|1
+1007|The Lord of the Rings|J.R.R. Tolkien|1
+1001|The Great Gatsby|F. Scott Fitzgerald|1
+1015|The Adventures of Huckleberry Finn|Mark Twain|1
+1005|The Catcher in the Rye|J.D. Salinger|1
+1012|One Hundred Years of Solitude|Gabriel Garcia Marquez|1
+1002|To Kill a Mockingbird|Harper Lee|1
+1018|The Odyssey|Homer|1
+1009|The Hobbit|J.R.R. Tolkien|1
+1004|Pride and Prejudice|Jane Austen|1
+1016|Moby Dick|Herman Melville|1
+1011|The Alchemist|Paulo Coelho|1
+1006|Brave New World|Aldous Huxley|1
+1019|Frankenstein|Mary Shelley|1
+1008|Harry Potter and the Philosophers Stone|J.K. Rowling|1
+1013|Don Quixote|Miguel de Cervantes|1
+1010|Animal Farm|George Orwell|1
+1020|The Picture of Dorian Gray|Oscar Wilde|1
+1014|Crime and Punishment|Fyodor Dostoevsky|1
+1017|War and Peace|Leo Tolstoy|1

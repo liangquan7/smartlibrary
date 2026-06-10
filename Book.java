@@ -32,6 +32,26 @@ public class Book {
         this.isbn = isbn;
         this.title = title;
         this.author = author;
+        stock = 1;
+        
+        // Initialize BST pointers to null (no children yet)
+        this.left = null;
+        this.right = null;
+    }
+
+    /**
+     * Creates a new book node with stock specified
+     * @param isbn The unique book identifier
+     * @param title The book's title
+     * @param author The book's author
+     * @param stock The stock of the book
+     */
+    public Book(int isbn, String title, String author, int stock) {
+        // Initialize book properties
+        this.isbn = isbn;
+        this.title = title;
+        this.author = author;
+        this.stock = stock;
         
         // Initialize BST pointers to null (no children yet)
         this.left = null;
@@ -75,6 +95,21 @@ public class Book {
     public int getStock() {
         return stock;
     }
+    
+    // --- Stock Management ---
+
+    public void setStock(int newStock) {
+        if(newStock < 0 ){return;}
+        this.stock = newStock;
+    }
+
+    public boolean borrowOut(){
+        stock--;
+        return stock<=0;
+    }
+
+    public void returnIn(){ stock++; }
+
     
     // --- BST Pointer Accessors ---
     

@@ -10,6 +10,7 @@ public class BorrowHistory {
     private int isbn;
     private String title;
     private String author;
+    private String borrowerID;
     
     // Constructs a new borrowing history record
     public BorrowHistory() {
@@ -31,6 +32,10 @@ public class BorrowHistory {
     public String getAuthor() {
         return author;
     }
+
+    public String getBID() {
+        return borrowerID;
+    }
     
     // --- Setter methods ---
     
@@ -46,12 +51,16 @@ public class BorrowHistory {
         this.author = author;
     }
     
+    public void setBID(String bid) {
+        this.borrowerID = bid;
+    }
     // --- String Representation ---
     
     @Override
     public String toString() {
         return "BorrowHistory [isbn=" + isbn + 
             ", title=" + title + 
-            ", author=" + author + "]";
+            ", author=" + author + 
+            ", borrowerID=" + borrowerID + "]";
     }
 }

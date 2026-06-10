@@ -38,7 +38,7 @@ public interface LibraryADT {
      * @param title  The book's title
      * @param author The book's author
      */
-    void addBook(int isbn, String title, String author);
+    void addBook(int isbn, String title, String author, int stock);
 
     /**
      * Processes a book borrowing request.
@@ -47,13 +47,13 @@ public interface LibraryADT {
      *
      * @param isbn The ISBN of the book to borrow
      */
-    void borrowBook(int isbn);
+    void borrowBook(int isbn, String borrowerID);
 
     /**
      * Displays the latest borrowing history from the stack.
      * Shows the most recent borrowing operations in LIFO order (up to 10).
      */
-    void viewLatestHistory();
+    void viewLatestHistory(String borrowerID);
 
     /**
      * Searches for a book by ISBN using a recursive BST traversal — O(log n).
@@ -68,7 +68,7 @@ public interface LibraryADT {
      * history stack and re-inserts it into the BST catalogue via addBook().
      * Prints a descriptive message if the stack is empty.
      */
-    void returnBook(int isbn);
+    void returnBook(int isbn, String borrowerID);
 
     // =========================================================================
     //  Startup — data loading
@@ -159,4 +159,23 @@ public interface LibraryADT {
      * @return The root {@link Book} node, or {@code null} for an empty library
      */
     Book getRoot();
+
+    // =========================================================================
+    //  New Addition: RBAC and Delete   Date: 2026-6-10
+    // =========================================================================
+
+    /**
+     * Preloads borrower accounts from a text file (e.g., users.txt).
+     */
+    void preloadBorrowers(String filePath);
+
+    /**
+     * Authenticates a borrower using their ID and plaintext key.
+     */
+    boolean authenticateBorrower(String id, String rawKey);
+
+    /**
+     * Deletes a book entirely from the BST catalog (Librarian only).
+     */
+    void deleteBook(int isbn);
 }

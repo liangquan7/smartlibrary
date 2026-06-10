@@ -45,6 +45,11 @@ import javax.swing.table.*;
  */
 public class SmartLibraryGUI extends JFrame {
 
+    // RBAC flag
+    private boolean isLibrarian = false;
+    // UserID
+    private String currentUserID = null;
+
     // ── Backend — interface-typed for Information Hiding ──────────────────────
     private final LibraryADT library;
 
@@ -72,6 +77,7 @@ public class SmartLibraryGUI extends JFrame {
     private JTextField fAddIsbn;
     private JTextField fAddTitle;
     private JTextField fAddAuthor;
+    private JTextField fDeleteIsbn;
 
     // ── Search Book widgets ────────────────────────────────────────────────────
     private JTextField fSearchIsbn;
@@ -109,9 +115,17 @@ public class SmartLibraryGUI extends JFrame {
      */
     public SmartLibraryGUI(LibraryADT library) {
         this.library = library;
+
+        // Login-based Authorization
+        if (!authenticate()) {
+            System.exit(0);
+        }
+
         redirectSystemOut();   // must run before buildFrame() and before preloading
         buildFrame();
-        log("▶  Smart Library System started — restoring session...");
+
+        String roleStr = isLibrarian? "Librarian Mode" : "Borrower Mode";
+        log("▶  Smart Library System started (" + roleStr + ") — restoring session...");
     }
 
     // ==========================================================================
@@ -239,11 +253,21 @@ public class SmartLibraryGUI extends JFrame {
         container.setBackground(C_BG);
         container.setBorder(new EmptyBorder(14, 14, 14, 7));
 
-        container.add(buildAddCard());
-        container.add(vGap(12));
-        container.add(buildSearchCard());
-        container.add(vGap(12));
-        container.add(buildBorrowCard());
+        if(isLibrarian){
+            //Librarians' Panels
+            container.add(buildAddCard());
+            container.add(vGap(12));
+            container.add(buildDeleteCard());
+            container.add(vGap(12));
+            container.add(buildSearchCard());
+
+        }else{
+            //Borrowers' Panels
+            container.add(buildSearchCard());
+            container.add(vGap(12));
+            container.add(buildBorrowCard());
+        }
+        
         container.add(Box.createGlue());
 
         JScrollPane scroll = new JScrollPane(container,
@@ -276,7 +300,7 @@ public class SmartLibraryGUI extends JFrame {
         fAddTitle  = makeField("e.g.  The Great Gatsby");
         fAddAuthor = makeField("e.g.  F. Scott Fitzgerald");
 
-        JButton btn = makeButton("＋  Add to Library", C_GREEN);
+        JButton btn = makeButton("＋  Add Book / Stock", C_GREEN);
         btn.addActionListener(e -> handleAddBook());
 
         card.add(makeSectionTitle("Add Book", C_GREEN));
@@ -349,6 +373,25 @@ public class SmartLibraryGUI extends JFrame {
         return card;
     }
 
+    // ─── Delete Book (For Librarians) ─────────────────────────────────────────
+    private JPanel buildDeleteCard() {
+        // 借用橙色作为删除警示色
+        JPanel card = makeCard(C_ORANGE);
+
+        fDeleteIsbn = makeField("Enter ISBN to delete");
+
+        JButton btn = makeButton("🗑  Delete Book", C_ORANGE);
+        btn.addActionListener(e -> handleDeleteBook());
+
+        card.add(makeSectionTitle("Delete Book", C_ORANGE));
+        card.add(vGap(10));
+        card.add(makeFieldRow("ISBN", fDeleteIsbn));
+        card.add(vGap(12));
+        card.add(btn);
+
+        return card;
+    }
+
     // ==========================================================================
     //  OUTPUT CARDS  (right side)
     // ==========================================================================
@@ -396,7 +439,7 @@ public class SmartLibraryGUI extends JFrame {
 
         JButton printBtn = makeLinkButton("⟳ Print to Console");
         printBtn.addActionListener(e -> {
-            library.viewLatestHistory();
+            library.viewLatestHistory(isLibrarian ? null : currentUserID); // Print all history for librarians, filter by user for borrowers
             setStatus("History printed to console.");
         });
 
@@ -425,11 +468,13 @@ public class SmartLibraryGUI extends JFrame {
         JPanel northPanel = new JPanel(new BorderLayout(0, 8));
         northPanel.setOpaque(false);
         northPanel.add(hdr,         BorderLayout.NORTH);
-        northPanel.add(returnPanel, BorderLayout.CENTER);
+        if (!isLibrarian) {
+            northPanel.add(returnPanel, BorderLayout.CENTER);
+        }
 
         // ── Non-editable table model ───────────────────────────────────────────
         historyModel = new DefaultTableModel(
-                new String[]{"#", "Title", "Author", "ISBN"}, 0) {
+                new String[]{"#", "Title", "Author", "ISBN", "Borrower ID"}, 0) {
             @Override
             public boolean isCellEditable(int row, int col) { return false; }
         };
@@ -485,6 +530,7 @@ public class SmartLibraryGUI extends JFrame {
         table.getColumnModel().getColumn(2).setPreferredWidth(150);
         table.getColumnModel().getColumn(3).setPreferredWidth(60);
         table.getColumnModel().getColumn(3).setMaxWidth(72);
+        table.getColumnModel().getColumn(4).setPreferredWidth(80);
 
         // Alternating row colours + left-padded cell text
         table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
@@ -558,12 +604,18 @@ public class SmartLibraryGUI extends JFrame {
     // 从栈底到栈顶插入到表格第0行，保持 LIFO 顺序 from the lower to the top, keep LIFO sequence
     for (int i = 0; i < stack.size(); i++) {
         BorrowHistory record = stack.get(i);
+
+        // RBAC: Borrowers only see their own history; librarians see all history 
+        if(!isLibrarian && !currentUserID.equals(record.getBID())){
+            continue;
+        }
         borrowSeq++;
         historyModel.insertRow(0, new Object[]{
             borrowSeq,
             record.getTitle(),
             record.getAuthor(),
-            record.getIsbn()
+            record.getIsbn(),
+            record.getBID(),
         });
     }
     log("[Sync] Restored " + stack.size() + " history record(s) to the table.");
@@ -608,7 +660,7 @@ public class SmartLibraryGUI extends JFrame {
             return;
         }
 
-        library.addBook(isbn, title, author);     // ← LibraryADT only
+        library.addBook(isbn, title, author, 1);     // ← LibraryADT only
 
         log("[Add]    ISBN " + isbn + " → " + title + " by " + author);
         setStatus("Added: " + title + "  (ISBN " + isbn + ")");
@@ -736,7 +788,7 @@ public class SmartLibraryGUI extends JFrame {
         String title  = book.getTitle();
         String author = book.getAuthor();
 
-        library.borrowBook(isbn);                 // ← LibraryADT only
+        library.borrowBook(isbn, currentUserID);                 // ← LibraryADT only
 
         // Insert at row 0 → newest record always appears at the top (LIFO)
         borrowSeq++;
@@ -784,12 +836,37 @@ public class SmartLibraryGUI extends JFrame {
         }
 
     // 调用 LibraryADT 中的 returnBook 方法（注意接口中已经改为 returnBook(int isbn)）
-            library.returnBook(isbn);
+            library.returnBook(isbn, currentUserID);
 
     // 刷新历史表格（重新从栈中加载所有记录）
             syncHistoryTableFromStack();
             isbnField.setText("");
             setStatus("Returned book with ISBN " + isbn);
+    }
+
+    /**
+     * Handles the "Delete Book" button click (Librarian only).
+     */
+    private void handleDeleteBook() {
+        String isbnRaw = fieldValue(fDeleteIsbn);
+        if (isbnRaw.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter an ISBN to delete.", "Missing Input", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int isbn;
+        try {
+            isbn = Integer.parseInt(isbnRaw);
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "ISBN must be a whole number.", "Invalid ISBN", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        library.deleteBook(isbn);     // ← Calls the newly added LibraryADT method
+        setStatus("Attempted deletion for ISBN: " + isbn);
+        
+        clearField(fDeleteIsbn);
+        fDeleteIsbn.requestFocus();
     }
 
     // ==========================================================================
@@ -959,6 +1036,9 @@ public class SmartLibraryGUI extends JFrame {
             // Declared as LibraryADT — concrete type is hidden from this point on
             LibraryADT library = new LibraryImpl();
 
+            // ── Step 0: Load Borrowers FIRST so login verification works ──
+            library.preloadBorrowers("users.txt");
+            
             // ── Step 1: Build GUI first ────────────────────────────────────────
             // MUST come before preloadData() so the System.out redirect is active
             // and all load messages appear in the GUI console, not the terminal.
@@ -980,5 +1060,61 @@ public class SmartLibraryGUI extends JFrame {
             // ── Step 4: Sync GUI history table from the restored stack ─────────
             gui.syncHistoryTableFromStack();
         });
+    }
+
+    // ==========================================================================
+    //  AUTHENTICATION (Login Dialog)
+    // ==========================================================================
+    /**
+     * Blocks execution and prompts the user to log in before the main frame loads.
+     * @return true if successfully authenticated, false if user exits.
+     */
+    private boolean authenticate() {
+        while (true) {
+            String[] options = {"Librarian", "Borrower", "Exit"};
+            int choice = JOptionPane.showOptionDialog(null, 
+                    "Select Login Role", "Smart Library Login",
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, 
+                    null, options, options[0]);
+
+            if (choice == 2 || choice == JOptionPane.CLOSED_OPTION) {
+                return false; // User closed the dialog or clicked Exit
+            }
+
+            if (choice == 0) { // Librarian
+                JPasswordField pf = new JPasswordField();
+                int okCxl = JOptionPane.showConfirmDialog(null, pf, 
+                        "Enter Librarian Password (42):", 
+                        JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+                if (okCxl == JOptionPane.OK_OPTION) {
+                    if ("42".equals(new String(pf.getPassword()))) {
+                        isLibrarian = true;
+                        return true;
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Access Denied!", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            } else if (choice == 1) { // Borrower
+                JPanel panel = new JPanel(new GridLayout(2, 2, 5, 5));
+                JTextField idField = new JTextField();
+                JPasswordField passField = new JPasswordField();
+                panel.add(new JLabel("Borrower ID:"));
+                panel.add(idField);
+                panel.add(new JLabel("Key:"));
+                panel.add(passField);
+
+                int res = JOptionPane.showConfirmDialog(null, panel, 
+                        "Borrower Login", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+                if (res == JOptionPane.OK_OPTION) {
+                    if (library.authenticateBorrower(idField.getText(), new String(passField.getPassword()))) {
+                        isLibrarian = false;
+                        currentUserID = idField.getText();
+                        return true;
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Invalid ID or Key!", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }
+        }
     }
 }

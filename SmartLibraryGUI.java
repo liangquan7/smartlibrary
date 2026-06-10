@@ -260,7 +260,8 @@ public class SmartLibraryGUI extends JFrame {
             container.add(buildDeleteCard());
             container.add(vGap(12));
             container.add(buildSearchCard());
-
+            container.add(vGap(12));
+            container.add(buildReturnCard());  // 新增
         }else{
             //Borrowers' Panels
             container.add(buildSearchCard());
@@ -792,7 +793,7 @@ public class SmartLibraryGUI extends JFrame {
 
         // Insert at row 0 → newest record always appears at the top (LIFO)
         borrowSeq++;
-        historyModel.insertRow(0, new Object[]{borrowSeq, title, author, isbn});
+        historyModel.insertRow(0, new Object[]{borrowSeq, title, author, isbn, currentUserID});
 
         log("[Borrow] ISBN " + isbn + ": " + title + " by " + author);
         setStatus("Borrowed: " + title + "  (ISBN " + isbn + ")");
@@ -1116,5 +1117,52 @@ public class SmartLibraryGUI extends JFrame {
                 }
             }
         }
+    }
+
+        //librarian return menu
+    private JPanel buildReturnCard() {
+        JPanel card = makeCard(C_ORANGE); // 重用橙色主题 orange title
+
+        JTextField returnIsbnField = makeField("Enter ISBN to return");
+
+        JButton btn = makeButton("↩  Return Book (any user)", C_ORANGE);
+            btn.addActionListener(e -> handleAdminReturnByIsbn(returnIsbnField));
+
+            card.add(makeSectionTitle("Return Book (Librarian)", C_ORANGE));
+            card.add(vGap(10));
+            card.add(makeFieldRow("ISBN", returnIsbnField));
+            card.add(vGap(12));
+            card.add(btn);
+
+            return card;
+    }
+
+    private void handleAdminReturnByIsbn(JTextField isbnField) {
+        String raw = isbnField.getText().trim();
+        if (raw.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                "Please enter an ISBN to return.",
+                "Missing Input",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        int isbn;
+        try {
+            isbn = Integer.parseInt(raw);
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this,
+                "ISBN must be a whole number.",
+                "Invalid ISBN",
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // 管理员归还，borrowerID 传 null，表示不限制用户 administer's return no limitation
+        library.returnBook(isbn, null);
+
+        // 刷新历史表格  refresh history
+        syncHistoryTableFromStack();
+        isbnField.setText("");
+        setStatus("Librarian returned book with ISBN " + isbn);
     }
 }

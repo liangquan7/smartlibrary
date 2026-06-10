@@ -428,11 +428,10 @@ public class LibraryImpl implements LibraryADT {
             while ((line = reader.readLine()) != null) {
                 if (line.trim().isEmpty() || line.startsWith("#")) continue;
                 String[] fields = line.split(","); 
-                if (fields.length >= 3) {
+                if (fields.length >= 2) {
                     String id = fields[0].trim();
                     String encryptedKey = fields[1].trim();
-                    int borrowed = Integer.parseInt(fields[2].trim());
-                    borrowers.add(new Borrower(id, encryptedKey, borrowed));
+                    borrowers.add(new Borrower(id, encryptedKey));
                 }
             }
             System.out.println("[INFO] Borrowers loaded successfully.");

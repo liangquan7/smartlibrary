@@ -98,6 +98,10 @@ public class SmartLibraryGUI extends JFrame {
     // ── Status bar ─────────────────────────────────────────────────────────────
     private JLabel statusLabel;
 
+    //read history's ISBN for quickely return
+    private JTextField fReturnIsbn;
+
+
     // ==========================================================================
     //  CONSTRUCTOR
     // ==========================================================================
@@ -456,22 +460,44 @@ public class SmartLibraryGUI extends JFrame {
         JLabel returnLabel = new JLabel("Return Book by ISBN:");
         returnLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
 
-        JTextField returnIsbnField = new JTextField();
-        returnIsbnField.setColumns(10);
+        fReturnIsbn = new JTextField();
+        fReturnIsbn.setColumns(10);
 
         JButton returnBtn = new JButton("Return");
-        returnBtn.addActionListener(e -> handleReturnByIsbn(returnIsbnField));
+        // 根据角色决定传入的 borrowerID：管理员传 null，普通用户传 currentUserID    read id to decide id
+        returnBtn.addActionListener(e -> {
+            String raw = fReturnIsbn.getText().trim();
+            if (raw.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter an ISBN to return.", "Missing Input", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            int isbn;
+            try {
+                isbn = Integer.parseInt(raw);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "ISBN must be a whole number.", "Invalid ISBN", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            // 关键：根据角色决定第二个参数  key: read the user's id
+            if (isLibrarian) {
+                library.returnBook(isbn, null);
+            } else {
+                library.returnBook(isbn, currentUserID);
+            }
+            // 刷新表格 refresh
+            syncHistoryTableFromStack();
+            fReturnIsbn.setText("");
+            setStatus("Returned book with ISBN " + isbn);
+        });
 
         returnPanel.add(returnLabel, BorderLayout.WEST);
-        returnPanel.add(returnIsbnField, BorderLayout.CENTER);
+        returnPanel.add(fReturnIsbn, BorderLayout.CENTER);
         returnPanel.add(returnBtn, BorderLayout.EAST);
 
         JPanel northPanel = new JPanel(new BorderLayout(0, 8));
         northPanel.setOpaque(false);
         northPanel.add(hdr,         BorderLayout.NORTH);
-        if (!isLibrarian) {
-            northPanel.add(returnPanel, BorderLayout.CENTER);
-        }
+        northPanel.add(returnPanel, BorderLayout.CENTER);   // 所有用户都显示
 
         // ── Non-editable table model ───────────────────────────────────────────
         historyModel = new DefaultTableModel(
@@ -482,6 +508,20 @@ public class SmartLibraryGUI extends JFrame {
 
         JTable table = new JTable(historyModel);
         styleHistoryTable(table);
+
+        //mouse monitor
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int row = table.getSelectedRow();
+                if (row != -1 && fReturnIsbn != null) {
+                    Object isbnObj = table.getValueAt(row, 3); // ISBN 列索引为3
+                    if (isbnObj != null) {
+                        fReturnIsbn.setText(isbnObj.toString());
+                    }
+                }
+            }
+        });
 
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createLineBorder(C_BORDER));
@@ -803,49 +843,6 @@ public class SmartLibraryGUI extends JFrame {
     }
 
     /**
-     * Handles the "↩  Undo Last Borrow / Return Book" button click.
-     *
-     * Strategy:
-     *   1. Guard against empty history using the GUI table row count (always
-     *      in sync with the internal stack depth).
-     *   2. Capture title and ISBN from row 0 BEFORE removal.
-     *   3. Delegate to library.returnLatestBook() — pops the stack and
-     *      re-inserts the book into the BST via addBook(), all via LibraryADT.
-     *   4. Remove row 0 from the table to mirror the LIFO pop.
-     */
-
-    //2.0 return book way
-    
-    private void handleReturnByIsbn(JTextField isbnField) {
-        String raw = isbnField.getText().trim();
-        if (raw.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                "Please enter an ISBN to return.",
-                "Missing Input",
-                JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        int isbn;
-        try {
-            isbn = Integer.parseInt(raw);
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this,
-                "ISBN must be a whole number.",
-                "Invalid ISBN",
-                JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-    // 调用 LibraryADT 中的 returnBook 方法（注意接口中已经改为 returnBook(int isbn)）
-            library.returnBook(isbn, currentUserID);
-
-    // 刷新历史表格（重新从栈中加载所有记录）
-            syncHistoryTableFromStack();
-            isbnField.setText("");
-            setStatus("Returned book with ISBN " + isbn);
-    }
-
-    /**
      * Handles the "Delete Book" button click (Librarian only).
      */
     private void handleDeleteBook() {
@@ -1119,7 +1116,7 @@ public class SmartLibraryGUI extends JFrame {
         }
     }
 
-        //librarian return menu
+    //librarian return menu
     private JPanel buildReturnCard() {
         JPanel card = makeCard(C_ORANGE); // 重用橙色主题 orange title
 
@@ -1158,6 +1155,7 @@ public class SmartLibraryGUI extends JFrame {
         }
 
         // 管理员归还，borrowerID 传 null，表示不限制用户 administer's return no limitation
+    
         library.returnBook(isbn, null);
 
         // 刷新历史表格  refresh history

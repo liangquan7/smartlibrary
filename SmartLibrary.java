@@ -115,7 +115,8 @@ public class SmartLibrary {
             System.out.println("2. Delete Book");
             System.out.println("3. Search Book");
             System.out.println("4. View All History");
-            System.out.println("5. Logout");
+            System.out.println("5. Return Book (any user)");
+            System.out.println("6. Logout");
             int choice = readInt(scanner, "Enter choice: ");
 
             switch (choice) {
@@ -126,7 +127,8 @@ public class SmartLibrary {
                     break;
                 case 3: handleSearchBook(library, scanner); break;
                 case 4: library.viewLatestHistory(null); break;
-                case 5: return; // Logout
+                case 5: handleReturnBook(library, scanner, null); break; // 新增：管理员还书
+                case 6: return;
                 default: System.out.println("Invalid choice.");
             }
         }

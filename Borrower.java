@@ -11,7 +11,6 @@ import java.util.Base64;
 public class Borrower {
     private String id;
     private String key;
-    private int numOfBorrowed;
 
     private static final byte KEY = 0x42;
 
@@ -20,11 +19,9 @@ public class Borrower {
      * 
      * @param id the borrower's ID
      * @param key the borrower's login key
-     * @param numOfBorrowed the number of books the borrower is currently borrowing
      */
-    public Borrower(String id, String key, int numOfBorrowed){
+    public Borrower(String id, String key){
         this.id = id;
-        this.numOfBorrowed = numOfBorrowed;
         this.key = decrypt(key);
     }
 
@@ -59,7 +56,6 @@ public class Borrower {
 
     //Getters
     public String getID(){ return id;}
-    public int getNumOfBorrowed(){return numOfBorrowed;}
 
     /**
      * Matches a input key
@@ -79,6 +75,6 @@ public class Borrower {
      */
     @Override
     public String toString() {
-        return id + "," + encrypt(key) + "," + numOfBorrowed; 
+        return id + "," + encrypt(key); 
     }
 }
